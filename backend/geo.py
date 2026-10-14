@@ -11,7 +11,7 @@ import math
 import time
 from pathlib import Path
 
-from .immotop import fold
+from .sources.base import fold
 
 # Centros aproximados de barrios de Luxemburgo ciudad y communes cercanas.
 ZONES = {

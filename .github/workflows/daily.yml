@@ -2,8 +2,18 @@ name: Pisos diarios
 
 on:
   schedule:
-    - cron: "47 5 * * *"   # 07:47 en verano / 06:47 en invierno (hora de Luxemburgo)
-  workflow_dispatch: {}     # botón "Run workflow" para lanzarlo a mano
+    - cron: "47 5 * * *"   # 07:47 en verano / 06:47 en invierno (hora de Luxemburgo): escaneo completo
+  workflow_dispatch:        # botón "Escanear" de la app, o "Run workflow" en GitHub
+    inputs:
+      mode:
+        description: "quick = solo lo más reciente (≈1 min) · full = todo y detecta retirados (≈4 min)"
+        type: choice
+        options: [quick, full]
+        default: quick
+      notify:
+        description: "Enviar notificación si hay pisos nuevos"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -15,7 +25,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -29,7 +39,7 @@ jobs:
       - name: Tests
         run: python tests/test_all.py
 
-      - name: Leer alertas, puntuar y avisar
+      - name: Escanear portales, puntuar y avisar
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
@@ -39,12 +49,17 @@ jobs:
           PUSH_SUBSCRIPTIONS: ${{ secrets.PUSH_SUBSCRIPTIONS }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           APP_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
-        run: python -m backend.run
+        run: |
+          MODE="${{ inputs.mode || 'full' }}"
+          FLAGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.notify }}" != "true" ]; then FLAGS="--no-notify"; fi
+          python -m backend.run --mode "$MODE" $FLAGS
 
       - name: Guardar resultados
         run: |
           git config user.name "pisos-bot"
           git config user.email "pisos-bot@users.noreply.github.com"
           git add docs/listings.json data/
-          git diff --cached --quiet || git commit -m "Actualización diaria $(date -u +%F)"
-          git push
+          git diff --cached --quiet && exit 0
+          git commit -m "Escaneo ${{ inputs.mode || 'full' }} $(date -u +%F' '%H:%M)"
+          for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done
