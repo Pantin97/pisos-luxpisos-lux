@@ -32,13 +32,13 @@ def parse_page(html: str) -> tuple[list[Listing], int | None]:
         total = parse_int(h.get_text())
     out = []
     for card in soup.select(".list-content"):
-        a = card.select_one("a.property-box-4-title") or card.select_one("a[data-ad-id]")
+        a = card.select_one("a[class*=property-box][class*=-title]") or card.select_one("a[data-ad-id]")
         if not a:
             continue
         title = clean(a.get_text())
         href = a.get("href") or ""
         ad_id = a.get("data-ad-id") or (re.search(r"id_(\d+)", href) or [None, None])[1]
-        price_el = card.select_one(".price-property-box-4")
+        price_el = card.select_one(".n-d-price") or card.select_one("[class*=price-property-box]")
         surf_el = card.select_one(".serp-ads-d-i")
         bed_el = card.select_one(".serp-ads-bed-d-b")
         agency_el = card.select_one(".serp-agency-title")

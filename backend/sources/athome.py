@@ -59,7 +59,7 @@ def to_listing(x: dict) -> Listing | None:
         zone=zone, lat=lat, lon=lon, photos=photos,
         agency=clean(pub.get("name")) or None, agency_site=pub.get("website") or None,
         kind=kind, new_build=bool(x.get("isNewBuild")),
-        street=clean(geo.get("streetAddress")) or None,
+        street=(st if len(st := clean(geo.get("streetAddress"))) > 3 and st.upper() not in ("NC", "N.C.", "N/A") else None),
         description=clean(x.get("description"))[:400] or None,
         features={
             "terrace": (x.get("terraceesCount") or 0) > 0,
