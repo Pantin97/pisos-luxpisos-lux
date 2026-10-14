@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────
+#  Pisos Lux — configuración
+#  Todo lo que afina la puntuación está aquí. Cambia, haz commit,
+#  y la siguiente ejecución diaria lo usa.
+# ─────────────────────────────────────────────────────────────
+
+search:
+  name: "Compra · Luxemburgo ciudad"
+  max_price: 1100000        # €; anuncios por encima se descartan
+  min_rooms: 2              # dormitorios
+  min_surface: 55           # m²; por debajo se descartan
+  max_age_days: 120         # anuncios vistos por primera vez hace más se ocultan
+
+# Lugar de referencia para el trayecto (línea recta).
+# Coordenadas aproximadas de tu trabajo en Capellen; ajústalas si quieres precisión.
+# Ojo: este nombre aparece en listings.json, que es público si el repo lo es.
+work:
+  label: "Trabajo (Capellen)"
+  lat: 49.6466
+  lon: 5.9893
+
+scoring:
+  # Pesos de cada componente (se normalizan, no hace falta que sumen 1)
+  weights:
+    value: 0.40     # €/m² frente a la referencia de la zona
+    size: 0.20      # superficie frente a la ideal
+    commute: 0.25   # distancia al trabajo
+    extras: 0.15    # terraza, planta, bajadas de precio…
+  ideal_surface: 95         # m² con los que "size" llega a 100
+  max_commute_km: 20        # a esta distancia "commute" vale 0
+
+  # €/m² de referencia por zona. Si una zona no está, se usa la mediana
+  # de todos los anuncios que ha visto la app. Puedes rellenarlo con los
+  # datos del Observatoire de l'Habitat para tener una referencia externa.
+  reference_eur_m2: {}
+  #   Kirchberg: 11800
+  #   Limpertsberg: 13000
+
+  # Palabras en el título y su efecto sobre "extras" (base 50)
+  keywords:
+    terrasse: 12
+    balcon: 8
+    jardin: 10
+    loggia: 6
+    "dernier étage": 10
+    penthouse: 10
+    neuf: 6
+    "nouvelle construction": 6
+    garage: 4
+    "rez-de-chaussée": -15
+    "à rénover": -12
+    viager: -40
+
+notify:
+  # Solo avisa de anuncios nuevos con al menos esta puntuación
+  min_score: 0
+  # Cuántos aparecen destacados en el resumen
+  top_n: 5
+
+sources:
+  immotop_email:
+    enabled: true
+    sender: "alerts.immotop.lu"
+    lookback_days: 120        # primera ejecución: cuánto historial leer
+    resolve_links: true       # sigue el enlace de seguimiento para obtener el ID real
+  geocoding:
+    use_nominatim: true       # geocodifica calles/zonas desconocidas (OpenStreetMap)

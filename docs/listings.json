@@ -1,0 +1,226 @@
+{
+ "generated_at": "2026-10-14T00:00+00:00",
+ "search": {
+  "name": "Compra · Luxemburgo ciudad",
+  "max_price": 1100000,
+  "min_rooms": 2,
+  "min_surface": 55,
+  "max_age_days": 120
+ },
+ "work": {
+  "label": "Trabajo (Capellen)",
+  "lat": 49.6466,
+  "lon": 5.9893
+ },
+ "weights": {
+  "value": 0.4,
+  "size": 0.2,
+  "commute": 0.25,
+  "extras": 0.15
+ },
+ "vapid_public_key": null,
+ "stats": {
+  "count": 4,
+  "new_count": 0,
+  "median_eur_m2": 13024
+ },
+ "listings": [
+  {
+   "id": "fp:038c20f3d360",
+   "title": "Appartement 2 chambres troisième étage, Kirchberg, Luxembourg",
+   "titles": [
+    "Appartement 2 chambres troisième étage, Kirchberg, Luxembourg"
+   ],
+   "kind": "Appartement",
+   "zone": "Kirchberg",
+   "zones": [
+    "Kirchberg"
+   ],
+   "street": null,
+   "floor": 3,
+   "surface": 88.0,
+   "rooms": 2,
+   "baths": 1,
+   "price": 920000,
+   "price_history": [
+    {
+     "date": "2026-09-07",
+     "price": 920000
+    }
+   ],
+   "eur_m2": 10455,
+   "eur_m2_ref": 13024,
+   "ref_kind": "mediana",
+   "first_seen": "2026-09-07",
+   "last_seen": "2026-09-07",
+   "days_listed": 37,
+   "alert_count": 1,
+   "url": "https://clicks.immotop.lu/f/a/fixture-0-0",
+   "image": null,
+   "lat": 49.629,
+   "lon": 6.16,
+   "geo_precision": "barrio",
+   "km_to_work": 12.4,
+   "is_new": false,
+   "badges": [],
+   "score": 76,
+   "score_parts": {
+    "value": 99,
+    "size": 93,
+    "commute": 38,
+    "extras": 55
+   },
+   "extras_reasons": [
+    "planta alta +5"
+   ]
+  },
+  {
+   "id": "fp:1bd50ab12092",
+   "title": "Appartement 2 chambres premier étage, Ville Haute, Luxembourg",
+   "titles": [
+    "Appartement 2 chambres premier étage, Ville Haute, Luxembourg"
+   ],
+   "kind": "Appartement",
+   "zone": "Ville Haute",
+   "zones": [
+    "Ville Haute"
+   ],
+   "street": null,
+   "floor": 1,
+   "surface": 80.0,
+   "rooms": 2,
+   "baths": null,
+   "price": 1025000,
+   "price_history": [
+    {
+     "date": "2026-09-15",
+     "price": 1025000
+    }
+   ],
+   "eur_m2": 12812,
+   "eur_m2_ref": 13024,
+   "ref_kind": "mediana",
+   "first_seen": "2026-09-15",
+   "last_seen": "2026-09-15",
+   "days_listed": 29,
+   "alert_count": 1,
+   "url": "https://clicks.immotop.lu/f/a/fixture-2-1",
+   "image": null,
+   "lat": 49.6116,
+   "lon": 6.13,
+   "geo_precision": "barrio",
+   "km_to_work": 10.9,
+   "is_new": false,
+   "badges": [],
+   "score": 57,
+   "score_parts": {
+    "value": 54,
+    "size": 84,
+    "commute": 45,
+    "extras": 50
+   },
+   "extras_reasons": []
+  },
+  {
+   "id": "fp:8e625792a66e",
+   "title": "Appartement 2 chambres deuxième étage, Ville Haute, Luxembourg",
+   "titles": [
+    "Appartement 2 chambres deuxième étage, Ville Haute, Luxembourg"
+   ],
+   "kind": "Appartement",
+   "zone": "Ville Haute",
+   "zones": [
+    "Ville Haute"
+   ],
+   "street": null,
+   "floor": 2,
+   "surface": 68.0,
+   "rooms": 2,
+   "baths": null,
+   "price": 900000,
+   "price_history": [
+    {
+     "date": "2026-09-15",
+     "price": 900000
+    }
+   ],
+   "eur_m2": 13235,
+   "eur_m2_ref": 13024,
+   "ref_kind": "mediana",
+   "first_seen": "2026-09-15",
+   "last_seen": "2026-09-15",
+   "days_listed": 29,
+   "alert_count": 1,
+   "url": "https://clicks.immotop.lu/f/a/fixture-2-0",
+   "image": null,
+   "lat": 49.6116,
+   "lon": 6.13,
+   "geo_precision": "barrio",
+   "km_to_work": 10.9,
+   "is_new": false,
+   "badges": [],
+   "score": 52,
+   "score_parts": {
+    "value": 46,
+    "size": 72,
+    "commute": 45,
+    "extras": 55
+   },
+   "extras_reasons": [
+    "planta alta +5"
+   ]
+  },
+  {
+   "id": "fp:6483755d6eda",
+   "title": "Appartement 2 chambres 9, 9a, Rue Josephine Jacquemart-jaans. L-1874, Luxembourg, Limpertsberg, Luxembourg",
+   "titles": [
+    "Appartement 2 chambres 9, 9a, Rue Josephine Jacquemart-jaans. L-1874, Luxembourg, Limpertsberg, Luxembourg",
+    "Appartement 2 chambres 22, Rue Joséphine Jacquemart-Jaans, Belair, Luxembourg"
+   ],
+   "kind": "Appartement",
+   "zone": "Limpertsberg",
+   "zones": [
+    "Limpertsberg",
+    "Belair"
+   ],
+   "street": "Rue Josephine Jacquemart-jaans",
+   "floor": null,
+   "surface": 77.0,
+   "rooms": 2,
+   "baths": null,
+   "price": 1047740,
+   "price_history": [
+    {
+     "date": "2026-09-14",
+     "price": 1047740
+    }
+   ],
+   "eur_m2": 13607,
+   "eur_m2_ref": 13024,
+   "ref_kind": "mediana",
+   "first_seen": "2026-09-14",
+   "last_seen": "2026-10-07",
+   "days_listed": 30,
+   "alert_count": 3,
+   "url": "https://clicks.immotop.lu/f/a/fixture-4-0",
+   "image": null,
+   "lat": 49.621,
+   "lon": 6.123,
+   "geo_precision": "barrio",
+   "km_to_work": 10.0,
+   "is_new": false,
+   "badges": [
+    "reanunciado",
+    "duplicado"
+   ],
+   "score": 52,
+   "score_parts": {
+    "value": 39,
+    "size": 81,
+    "commute": 50,
+    "extras": 50
+   },
+   "extras_reasons": []
+  }
+ ]
+}
