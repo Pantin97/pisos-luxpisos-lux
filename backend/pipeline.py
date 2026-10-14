@@ -96,7 +96,7 @@ def score_all(history: dict, cfg: dict, geocoder: Geocoder, today: datetime,
     for rec in history.get("listings", {}).values():
         if not rec.get("price") or not rec.get("surface"):
             continue
-        if rec["price"] > search["max_price"] or rec["surface"] < search.get("min_surface", 0):
+        if rec["price"] > search["max_price"] or rec["price"] < search.get("min_price", 0) or rec["surface"] < search.get("min_surface", 0):
             continue
         if rec.get("rooms") is not None and rec["rooms"] < search.get("min_rooms", 0):
             continue

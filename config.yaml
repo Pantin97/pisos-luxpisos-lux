@@ -6,6 +6,7 @@
 
 search:
   name: "Compra · Luxemburgo ciudad"
+  min_price: 150000         # €; por debajo se descarta (evita mezclar alertas de alquiler)
   max_price: 1100000        # €; anuncios por encima se descartan
   min_rooms: 2              # dormitorios
   min_surface: 55           # m²; por debajo se descartan
