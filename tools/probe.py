@@ -3,15 +3,14 @@ import pathlib, sys, time, requests
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
       "Accept-Language": "fr-LU,fr;q=0.9,en;q=0.8", "Accept": "text/html,application/xhtml+xml"}
 URLS = {
- "athome_p1": "https://www.athome.lu/srp/?tr=buy&q=d8380e34&ptypes=flat,4,7,5,6,42,32,41,43&price_max=1100000&bedrooms_min=2&sort=date_desc",
- "athome_p2": "https://www.athome.lu/srp/?tr=buy&q=d8380e34&ptypes=flat,4,7,5,6,42,32,41,43&price_max=1100000&bedrooms_min=2&sort=date_desc&page=2",
- "immotop_p1": "https://www.immotop.lu/vente-appartements/luxembourg/?prezzoMassimo=1100000&criterio=dataModifica&ordine=desc",
- "immotop_p2": "https://www.immotop.lu/vente-appartements/luxembourg/?prezzoMassimo=1100000&criterio=dataModifica&ordine=desc&pag=2",
- "wortimmo": "https://www.wortimmo.lu/fr/vente/appartement/luxembourg",
- "wortimmo_search": "https://www.wortimmo.lu/fr/recherche?transaction=vente&type=appartement&localite=luxembourg",
- "luxbazar": "https://www.luxbazar.lu/fr/immobilier/appartements/a-vendre",
- "weckbecker": "http://www.weckbecker.lu",
- "glesener": "https://www.glesener.lu",
+ "wortimmo_app": "https://www.wortimmo.lu/fr/vente/appartement",
+ "wortimmo_app_lux": "https://www.wortimmo.lu/fr/vente/appartement?localite=Luxembourg&prix_max=1100000",
+ "trovit": "https://appartement.trovit.lu/index.php/cod.search_homes/type.1/what_d.luxembourg/order_by.source_date/price_max.1100000/rooms_min.2/",
+ "trovit_home": "https://www.trovit.lu/",
+ "vivi": "https://www.vivi.lu/",
+ "properstar": "https://www.properstar.lu/luxembourg/luxembourg/acheter/appartement",
+ "newimmo": "https://www.newimmo.lu",
+ "unicorn": "https://www.unicorn.lu",
 }
 out = pathlib.Path("probe"); out.mkdir(exist_ok=True)
 sys.stdout.reconfigure(line_buffering=True)
