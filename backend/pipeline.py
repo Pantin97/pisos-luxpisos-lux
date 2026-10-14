@@ -322,7 +322,7 @@ def score_all(history: dict, cfg: dict, geocoder: Geocoder, now: datetime, new_k
             "discount": round(discount, 3),
             "details": {k: det.get(k) for k in DETAIL_KEYS if det.get(k) not in (None, False, [], "")} or None,
         })
-    out.sort(key=lambda x: (not x["active"], -x["score"], x["price"]))
+    out.sort(key=lambda x: (not x["active"], "compromiso" in x["badges"], -x["score"], x["price"]))
     return out
 
 

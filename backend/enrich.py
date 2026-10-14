@@ -66,7 +66,7 @@ def _rx_detail(html: str) -> dict:
     return {
         "energy_class": _cls(g("energyClass")), "insulation_class": _cls(g("insulationClass")),
         "construction_year": g("constructionYear", int), "renovation_year": g("renovationYear", int),
-        "charges_month": round(charges / 12) if freq == "yearly" and charges else (round(charges) or None),
+        "charges_month": _monthly(charges, freq),
         "heating": [lbl for key, lbl in (("hasGasHeating", "gas"), ("hasPumpHeating", "bomba de calor"),
                                          ("hasOilHeating", "gasóleo"), ("hasElectricHeating", "eléctrica"))
                     if g(key, bool)],
@@ -78,6 +78,14 @@ def _rx_detail(html: str) -> dict:
         "under_offer": bool(g("underSalesAgreement", bool)), "exclusive_mandate": bool(g("hasExclusiveMandate", bool)),
         "virtual_visit": g("virtualVisit"), "photos": [], "description": None,
     }
+
+
+def _monthly(charges, freq) -> int | None:
+    """athome marca como anuales importes que en la práctica son mensuales (250 € «al año»):
+    por debajo de 1 500 € se toman como mensuales."""
+    if not charges:
+        return None
+    return round(charges / 12) if freq == "yearly" and charges >= 1500 else round(charges)
 
 
 def _cls(v) -> str | None:
@@ -111,7 +119,7 @@ def parse_athome_detail(html: str) -> dict:
         "insulation_class": _cls((en.get("thermalInsulation") or {}).get("insulationClass")) or _cls(old.get("thermalInsulationClass")),
         "construction_year": ch.get("constructionYear") or None,
         "renovation_year": ch.get("renovationYear") or None,
-        "charges_month": round(charges / 12) if freq == "yearly" and charges else (charges or None),
+        "charges_month": _monthly(charges, freq),
         "heating": heating,
         "lift": bool(ch.get("hasLift")),
         "balcony_m2": ch.get("balconySurface") or (1 if ch.get("hasBalcony") else None),

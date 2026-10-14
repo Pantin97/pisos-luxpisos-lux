@@ -456,7 +456,7 @@
     const row = (k, v) => v != null && v !== "" && rows.push(`<div class="cell"><span class="k">${k}</span><span class="v">${v}</span></div>`);
     row("Clase energética", d.energy_class ? `${energyChip(d.energy_class, true)}${d.insulation_class ? ` <small style="color:var(--label-2)">aislamiento</small> ${energyChip(d.insulation_class, true)}` : ""}` : null);
     row("Construcción", d.construction_year ? `${d.construction_year}${d.renovation_year ? ` · reformado ${d.renovation_year}` : ""}` : null);
-    row("Gastos de comunidad", d.charges_month ? `${eur(d.charges_month)}/mes` : null);
+    row("Gastos de comunidad", d.charges_month ? `≈ ${eur(d.charges_month)}/mes` : null);
     row("Calefacción", d.heating && d.heating.length ? esc(d.heating.join(", ")) : null);
     const out = [d.terrace_m2 && `terraza${d.terrace_m2 > 1 ? ` ${nf1.format(d.terrace_m2)} m²` : ""}`,
       d.balcony_m2 && `balcón${d.balcony_m2 > 1 ? ` ${nf1.format(d.balcony_m2)} m²` : ""}`,
