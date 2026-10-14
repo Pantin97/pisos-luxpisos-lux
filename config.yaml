@@ -48,6 +48,8 @@ scoring:
     viager: -40
 
 notify:
+  # Solo avisa de pisos nuevos en estos barrios (lista vacía [] = todos)
+  zones: ["Limpertsberg"]
   # Solo avisa de anuncios nuevos con al menos esta puntuación
   min_score: 0
   # Cuántos aparecen destacados en el resumen

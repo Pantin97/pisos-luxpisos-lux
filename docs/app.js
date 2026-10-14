@@ -17,12 +17,13 @@
     filter: "todos",
     sort: P.sort || "score",
     saved: P.saved || {}, dropped: P.dropped || {},
+    zones: Array.isArray(P.zones) ? P.zones : ["Limpertsberg"],   // [] = todos los barrios
     token: P.token || "",
     shown: 20,
     scan: null,
     map: null,
   };
-  const persist = () => store.save({ saved: S.saved, dropped: S.dropped, sort: S.sort, token: S.token });
+  const persist = () => store.save({ saved: S.saved, dropped: S.dropped, sort: S.sort, token: S.token, zones: S.zones });
 
   function initialView() {
     const q = new URLSearchParams(location.search).get("tab") || location.hash.replace("#", "");
@@ -81,7 +82,16 @@
     km: (a, b) => (a.km_to_work ?? 99) - (b.km_to_work ?? 99),
     recent: (a, b) => b.first_seen.localeCompare(a.first_seen) || b.score - a.score,
   };
-  const pool = () => all().filter((l) => !S.dropped[l.id]);
+  const inZones = (l) => !S.zones.length || S.zones.includes(l.zone);
+  const pool = () => all().filter((l) => !S.dropped[l.id] && inZones(l));
+  const zoneLabel = () => (!S.zones.length ? "Todos los barrios" : S.zones.length === 1 ? S.zones[0] : `${S.zones.length} barrios`);
+  function zoneList() {
+    const by = {};
+    all().filter((l) => l.active && l.zone && l.zone !== "Luxembourg").forEach((l) => { (by[l.zone] = by[l.zone] || []).push(l.eur_m2); });
+    S.zones.forEach((z) => { by[z] = by[z] || []; });
+    return Object.entries(by).map(([zone, v]) => ({ zone, n: v.length, med: v.length ? v.sort((a, b) => a - b)[Math.floor(v.length / 2)] : null }))
+      .sort((a, b) => (S.zones.includes(b.zone) - S.zones.includes(a.zone)) || b.n - a.n || a.zone.localeCompare(b.zone));
+  }
   function feedList() {
     const f = FILTERS.find((x) => x[0] === S.filter) || FILTERS[0];
     return pool().filter((l) => l.active && f[2](l)).sort(sortFns[S.sort]);
@@ -214,26 +224,30 @@
 
   /* ───────────── vistas ───────────── */
   function viewInicio() {
-    const d = S.data, s = d.stats, list = feedList();
-    const counts = Object.fromEntries(FILTERS.map(([id, , fn]) => [id, pool().filter((l) => l.active && fn(l)).length]));
-    const sub = `${esc(d.search.name)} · actualizado ${ago(d.generated_at)}`;
+    const d = S.data, list = feedList();
+    const act = pool().filter((l) => l.active);
+    const counts = Object.fromEntries(FILTERS.map(([id, , fn]) => [id, act.filter(fn).length]));
+    const m2 = act.map((l) => l.eur_m2).sort((a, b) => a - b);
+    const sub = `${esc(zoneLabel())} · actualizado ${ago(d.generated_at)}`;
     const srcOk = (d.sources || []).filter((x) => !x.error).length;
     return `${largeTitle("Pisos", sub)}
       <div class="statline">
-        <div class="stat glass"><b>${s.count}</b><span>activos</span></div>
-        <div class="stat glass"><b>${s.new_count}</b><span>nuevos</span></div>
-        <div class="stat glass"><b>${nf.format(s.median_eur_m2 || 0)}</b><span>€/m² mediana</span></div>
+        <div class="stat glass"><b>${act.length}</b><span>activos</span></div>
+        <div class="stat glass"><b>${counts.nuevos}</b><span>nuevos</span></div>
+        <div class="stat glass"><b>${m2.length ? nf.format(m2[Math.floor(m2.length / 2)]) : "—"}</b><span>€/m² mediana</span></div>
+        <div class="stat glass"><b>${counts.exclusivos}</b><span>solo agencia</span></div>
         <div class="stat glass"><b>${srcOk}/${(d.sources || []).length}</b><span>fuentes ok</span></div>
-        <div class="stat glass"><b>${s.exclusive}</b><span>solo agencia</span></div>
       </div>
-      <div class="chips" role="toolbar" aria-label="Filtros">${FILTERS.map(([id, label]) =>
+      <div class="chips" role="toolbar" aria-label="Filtros">
+        <button class="chip glass zone-chip" id="zone-btn" aria-haspopup="dialog">${I.pin}${esc(zoneLabel())}<span class="caret">▾</span></button>
+        ${FILTERS.map(([id, label]) =>
         `<button class="chip glass" data-filter="${id}" aria-pressed="${S.filter === id}">${label}<span class="n">${counts[id]}</span></button>`).join("")}</div>
       <div class="sortbar"><span>${list.length} pisos</span>
         <label>${I.sort.replace("<svg", '<svg width="14" height="14" style="vertical-align:-2px;margin-right:4px"')}<select id="sort" aria-label="Ordenar">${SORTS.map(([v, t]) =>
           `<option value="${v}" ${S.sort === v ? "selected" : ""}>${t}</option>`).join("")}</select></label></div>
       ${list.length ? `<div class="feed">${list.slice(0, S.shown).map(card).join("")}</div>
         ${list.length > S.shown ? '<div class="more" id="more">Cargando más…</div>' : ""}`
-        : emptyState("Nada por aquí", "Prueba otro filtro o lanza un escaneo con el botón de la derecha.")}`;
+        : emptyState("Nada por aquí", `No hay pisos con este filtro en ${esc(zoneLabel())}. Prueba otro filtro, añade barrios o lanza un escaneo.`)}`;
   }
 
   function viewGuardados() {
@@ -292,7 +306,25 @@
     if (S.view === "ajustes") { renderToken(); renderPush(); }
   }
 
+  function openZones() {
+    const sel = new Set(S.zones);
+    const zones = zoneList();
+    const row = (z) => `<button class="cell zone-row" data-zone="${esc(z.zone)}" role="checkbox" aria-checked="${sel.has(z.zone)}">
+        <span class="k">${esc(z.zone)}</span><span class="v">${z.n} · ${z.med ? `${nf.format(z.med)} €/m²` : "—"}<span class="check">${sel.has(z.zone) ? "✓" : ""}</span></span></button>`;
+    const { el, close } = sheet(`<div class="sheet-head"><h2>Barrios</h2><button class="pill-btn" id="z-all">Todos</button></div>
+      <p class="note" style="margin:-6px 6px 12px">Pisos activos y mediana de €/m² en cada barrio. Sin ninguno marcado se muestran todos.</p>
+      <div class="group">${zones.map(row).join("")}</div>
+      <button class="pill-btn primary wide" id="z-apply" style="width:100%;margin:6px 0 0">Mostrar pisos</button>`, () => { S.zones = [...sel]; persist(); S.shown = 20; render(); });
+    const paint = () => el.querySelectorAll(".zone-row").forEach((b) => {
+      const on = sel.has(b.dataset.zone); b.setAttribute("aria-checked", on); b.querySelector(".check").textContent = on ? "✓" : "";
+    });
+    el.querySelectorAll(".zone-row").forEach((b) => b.addEventListener("click", () => { const z = b.dataset.zone; sel.has(z) ? sel.delete(z) : sel.add(z); paint(); }));
+    el.querySelector("#z-all").addEventListener("click", () => { sel.clear(); paint(); });
+    el.querySelector("#z-apply").addEventListener("click", close);
+  }
+
   function bind() {
+    document.getElementById("zone-btn")?.addEventListener("click", openZones);
     document.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { S.filter = b.dataset.filter; S.shown = 20; render(); }));
     const sel = document.getElementById("sort");
     if (sel) sel.addEventListener("change", () => { S.sort = sel.value; S.shown = 20; persist(); render(); });

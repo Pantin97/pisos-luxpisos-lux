@@ -80,7 +80,10 @@ def immotop_alerts(cfg: dict, history: dict, now: datetime, first_run: bool, htm
 
 def notify(fresh: list[dict], cfg: dict, app_url: str | None) -> list[str]:
     log = []
-    items = [x for x in fresh if x["score"] >= cfg.get("notify", {}).get("min_score", 0)]
+    ncfg = cfg.get("notify", {})
+    zones = {z.lower() for z in (ncfg.get("zones") or [])}
+    items = [x for x in fresh if x["score"] >= ncfg.get("min_score", 0)
+             and (not zones or (x.get("zone") or "").lower() in zones)]
     if not items:
         return ["sin novedades que avisar"]
     best = items[0]

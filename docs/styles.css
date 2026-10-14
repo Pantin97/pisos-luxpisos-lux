@@ -312,3 +312,11 @@ textarea.input { height: 96px; padding: 10px 12px; font: 12px/1.4 ui-monospace, 
 .toast button { border: 0; background: none; color: var(--tint); font-weight: 700; cursor: pointer; padding: 0; }
 
 @media (prefers-reduced-motion: reduce) { .card-inner, .sheet, .toast { animation: none; transition: none; } }
+
+/* ── selector de barrios ── */
+.zone-chip { color: var(--tint); }
+.zone-chip svg { width: 16px; height: 16px; }
+.zone-chip .caret { font-size: 11px; opacity: .7; }
+.zone-row { width: 100%; border: 0; background: none; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.zone-row .check { display: inline-block; width: 22px; margin-left: 10px; color: var(--tint); font-weight: 700; text-align: center; }
+.zone-row[aria-checked="true"] .k { font-weight: 650; }
