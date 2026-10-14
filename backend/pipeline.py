@@ -167,6 +167,13 @@ def is_active(rec: dict) -> bool:
 
 # ───────────────────────── puntuación ─────────────────────────
 
+ENERGY_PTS = {"A": 12, "B": 8, "C": 4, "D": 0, "E": -4, "F": -8, "G": -12, "H": -12, "I": -12}
+NEGOTIABLE_DAYS = 120
+DETAIL_KEYS = ("energy_class", "insulation_class", "construction_year", "renovation_year", "charges_month",
+               "heating", "lift", "balcony_m2", "terrace_m2", "garden_m2", "parking", "cellar",
+               "listed_since", "under_offer", "exclusive_mandate", "virtual_visit")
+
+
 def _clamp(x: float, lo: float = 0, hi: float = 100) -> float:
     return max(lo, min(hi, x))
 
@@ -249,6 +256,15 @@ def score_all(history: dict, cfg: dict, geocoder: Geocoder, now: datetime, new_k
         if (rec.get("floor") or 0) >= 2:
             extras += 5
             reasons.append("planta alta +5")
+        det = rec.get("details") or {}
+        if (ec := det.get("energy_class")):
+            pts = ENERGY_PTS.get(ec, 0)
+            if pts:
+                extras += pts
+                reasons.append(f"clase energética {ec} {'+' if pts > 0 else ''}{pts}")
+        if det.get("cellar"):
+            extras += 2
+            reasons.append("trastero +2")
         prices = [p["price"] for p in rec["price_history"] if p["price"]]
         drop = (max(prices) - prices[-1]) / max(prices) if len(prices) > 1 else 0
         if drop > 0:
@@ -278,6 +294,13 @@ def score_all(history: dict, cfg: dict, geocoder: Geocoder, now: datetime, new_k
             badges.append("obra nueva")
         if not active:
             badges.append("retirado")
+        listed = det.get("listed_since")
+        on_market = (today - date.fromisoformat(listed)).days if listed else age
+        if on_market >= NEGOTIABLE_DAYS:
+            badges.append("negociable")
+        if det.get("under_offer"):
+            badges.append("compromiso")
+        discount = (ref - eur_m2) / ref if ref else 0
 
         out.append({
             "id": rec["id"], "title": rec.get("title"), "kind": rec.get("kind"), "zone": rec.get("zone"),
@@ -288,13 +311,16 @@ def score_all(history: dict, cfg: dict, geocoder: Geocoder, now: datetime, new_k
             "first_seen": rec["first_seen"], "last_seen": rec["last_seen"], "days_listed": age,
             "sources": [{"name": SOURCE_LABEL.get(s, s), "key": s, "url": rec.get("urls", {}).get(s)} for s in sources],
             "vias": rec.get("vias", []), "only_on": only, "agencies": rec.get("agencies", [])[:3],
-            "photos": rec.get("photos", [])[:5], "description": (rec.get("description") or "")[:280],
+            "photos": rec.get("photos", [])[:8 if rec.get("details") else 5],
+            "description": (rec.get("description") or "")[:700 if rec.get("details") else 280],
             "lat": rec.get("lat"), "lon": rec.get("lon"), "geo_precision": rec.get("geo_precision"),
             "km_to_work": km, "is_new": is_new, "active": active, "badges": badges,
             "features": [FEATURE_PTS[f][0] for f in FEATURE_PTS if rec.get("features", {}).get(f)],
             "score": round(total), "score_parts": {"value": round(value), "size": round(size),
                                                     "commute": round(commute), "extras": round(extras)},
-            "extras_reasons": reasons,
+            "extras_reasons": reasons, "days_on_market": on_market,
+            "discount": round(discount, 3),
+            "details": {k: det.get(k) for k in DETAIL_KEYS if det.get(k) not in (None, False, [], "")} or None,
         })
     out.sort(key=lambda x: (not x["active"], -x["score"], x["price"]))
     return out

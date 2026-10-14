@@ -2,7 +2,8 @@ name: Pisos diarios
 
 on:
   schedule:
-    - cron: "47 5 * * *"   # 07:47 en verano / 06:47 en invierno (hora de Luxemburgo): escaneo completo
+    - cron: "47 5 * * *"        # completo cada mañana: 07:47 en verano / 06:47 en invierno
+    - cron: "13 8-20/2 * * *"   # rápido cada 2 h de 10:13 a 22:13 (verano), para avisar de chollos al momento
   workflow_dispatch:        # botón "Escanear" de la app, o "Run workflow" en GitHub
     inputs:
       mode:
@@ -50,16 +51,22 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           APP_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
         run: |
-          MODE="${{ inputs.mode || 'full' }}"
-          FLAGS=""
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.notify }}" != "true" ]; then FLAGS="--no-notify"; fi
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "47 5 * * *" ]; then MODE=full; else MODE=quick; fi
+            FLAGS=""
+          else
+            MODE="${{ inputs.mode }}"
+            FLAGS=""
+            if [ "${{ inputs.notify }}" != "true" ]; then FLAGS="--no-notify"; fi
+          fi
+          echo "MODE=$MODE" >> "$GITHUB_ENV"
           python -m backend.run --mode "$MODE" $FLAGS
 
       - name: Guardar resultados
         run: |
           git config user.name "pisos-bot"
           git config user.email "pisos-bot@users.noreply.github.com"
-          git add docs/listings.json data/
+          git add docs/listings.json data/history_v2.json data/geocache.json
           git diff --cached --quiet && exit 0
-          git commit -m "Escaneo ${{ inputs.mode || 'full' }} $(date -u +%F' '%H:%M)"
+          git commit -m "Escaneo $MODE $(date -u +%F' '%H:%M)"
           for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done

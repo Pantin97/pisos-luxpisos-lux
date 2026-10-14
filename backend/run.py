@@ -24,6 +24,8 @@ from pathlib import Path
 import yaml
 
 from . import push
+from .alerts import compose, compute_events, load_watch
+from .enrich import enrich
 from .geo import Geocoder
 from .pipeline import ingest, mark_gone, score_all, zone_stats
 from .sources import athome, immotop_email, trovit, wortimmo
@@ -78,19 +80,8 @@ def immotop_alerts(cfg: dict, history: dict, now: datetime, first_run: bool, htm
     return res
 
 
-def notify(fresh: list[dict], cfg: dict, app_url: str | None) -> list[str]:
+def send_push(payload: dict, app_url: str | None) -> list[str]:
     log = []
-    ncfg = cfg.get("notify", {})
-    zones = {z.lower() for z in (ncfg.get("zones") or [])}
-    items = [x for x in fresh if x["score"] >= ncfg.get("min_score", 0)
-             and (not zones or (x.get("zone") or "").lower() in zones)]
-    if not items:
-        return ["sin novedades que avisar"]
-    best = items[0]
-    n = len(items)
-    title = f"{n} piso{'s' if n > 1 else ''} nuevo{'s' if n > 1 else ''}"
-    body = f"Mejor: {best['zone']} · {best['surface']:.0f} m² · {fmt_eur(best['price'])} · {best['score']} pts"
-    payload = {"title": title, "body": body, "url": "./?tab=nuevos", "tag": "pisos"}
     priv = os.environ.get("VAPID_PRIVATE_KEY")
     for sub in push.parse_subscriptions(os.environ.get("PUSH_SUBSCRIPTIONS")):
         if not priv:
@@ -104,8 +95,8 @@ def notify(fresh: list[dict], cfg: dict, app_url: str | None) -> list[str]:
     if topic := os.environ.get("NTFY_TOPIC"):
         try:
             import requests
-            requests.post(f"https://ntfy.sh/{topic}", data=body.encode(), timeout=10,
-                          headers={"Title": title, "Click": app_url or "", "Tags": "house"})
+            requests.post(f"https://ntfy.sh/{topic}", data=payload["body"].encode(), timeout=10,
+                          headers={"Title": payload["title"], "Click": app_url or "", "Tags": "house"})
             log.append("ntfy: enviado")
         except Exception as e:  # noqa: BLE001
             log.append(f"ntfy: error {e}")
@@ -158,10 +149,24 @@ def main(argv: list[str] | None = None) -> int:
     geocoder = Geocoder(DATA / "geocache.json", src_cfg.get("geocoding", {}).get("use_nominatim", True))
     ranked = score_all(history, cfg, geocoder, now, set(new_keys), backfill=first_run,
                        exclusive_trusted=athome_full)
+
+    # ficha completa de los candidatos, y se vuelve a puntuar con esos datos
+    watched = load_watch(DATA / "watch.json")
+    budget = cfg.get("details", {}).get("budget", {}).get(args.mode, 25)
+    if budget and not only:
+        st = enrich(history, cfg, watched, ranked, fetcher, now, budget)
+        print(f"· fichas: {st['items']} descargadas de {st['total_reported']} pendientes"
+              f"{', ERROR ' + st['error'] if st['error'] else ''}")
+        results.append(SourceResult("fichas", pages=st["pages"], total_reported=st["total_reported"],
+                                    complete=st["complete"], error=st["error"], seconds=st["seconds"]))
+        results[-1].listings = [None] * st["items"]  # solo para el contador
+        ranked = score_all(history, cfg, geocoder, now, set(new_keys), backfill=first_run,
+                           exclusive_trusted=athome_full)
     geocoder.save()
+    events = compute_events(history, ranked, set(new_keys), cfg, watched, now, first_run)
 
     run_info = {"at": now.isoformat(timespec="seconds"), "mode": args.mode, "new": len(new_keys),
-                "sources": [r.stats() for r in results]}
+                "events": len(events), "sources": [r.stats() for r in results]}
     history["runs"] = (history.get("runs", []) + [run_info])[-30:]
     DATA.mkdir(exist_ok=True)
     HISTORY.write_text(json.dumps(history, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -172,6 +177,7 @@ def main(argv: list[str] | None = None) -> int:
         "generated_at": now.isoformat(timespec="minutes"),
         "mode": args.mode,
         "search": cfg["search"], "work": cfg["work"], "weights": cfg["scoring"]["weights"],
+        "notify": {k: cfg.get("notify", {}).get(k) for k in ("zones", "deal_discount", "deal_score", "deal_zones")},
         "vapid_public_key": os.environ.get("VAPID_PUBLIC_KEY"),
         "repo": os.environ.get("GITHUB_REPOSITORY"),
         "stats": {
@@ -183,6 +189,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         "sources": [r.stats() for r in results],
         "zones": zone_stats(ranked)[:25],
+        "events": history.get("events", [])[-60:],
         "listings": ranked,
     }
     out = Path(args.out)
@@ -190,10 +197,9 @@ def main(argv: list[str] | None = None) -> int:
     out.write_text(json.dumps(output, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"· {len(active)} pisos activos, {len(new_keys)} nuevos en esta ejecución → {out.name}")
 
-    if not args.no_notify and not first_run:
-        fresh_ids = set(new_keys)
-        fresh = [x for x in ranked if x["id"] in fresh_ids and x["active"]]
-        for line in notify(fresh, cfg, os.environ.get("APP_URL")):
+    print(f"· eventos: {len(events)} ({', '.join(sorted({e['type'] for e in events})) or 'ninguno'})")
+    if not args.no_notify and (payload := compose(events)):
+        for line in send_push(payload, os.environ.get("APP_URL")):
             print("·", line)
     return 0
 

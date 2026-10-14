@@ -48,12 +48,25 @@ scoring:
     viager: -40
 
 notify:
-  # Solo avisa de pisos nuevos en estos barrios (lista vacía [] = todos)
+  # Barrios de los avisos de pisos nuevos y bajadas (lista vacía [] = todos).
+  # Los guardados avisan de bajadas, retiradas y compromisos estén donde estén.
   zones: ["Limpertsberg"]
+  # Chollo: aviso destacado si un piso nuevo o rebajado queda al menos este
+  # porcentaje por debajo de la mediana de su barrio, o supera esta puntuación
+  deal_discount: 0.15
+  deal_score: 85
+  deal_zones: []            # [] = los mismos barrios de arriba
   # Solo avisa de anuncios nuevos con al menos esta puntuación
   min_score: 0
   # Cuántos aparecen destacados en el resumen
   top_n: 5
+
+details:
+  # Ficha completa (clase energética, gastos, año, terraza…) de: barrios de
+  # los avisos, guardados y los mejor puntuados de toda la ciudad
+  top_n: 25
+  refresh_days: 7
+  budget: { full: 80, quick: 25 }   # fichas máximas por escaneo
 
 sources:
   # Escaneo completo (cada mañana) frente a rápido (botón de la app):

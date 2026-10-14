@@ -19,11 +19,15 @@
     saved: P.saved || {}, dropped: P.dropped || {},
     zones: Array.isArray(P.zones) ? P.zones : ["Limpertsberg"],   // [] = todos los barrios
     token: P.token || "",
+    removed: P.removed || {},          // guardados quitados (para sincronizar entre dispositivos)
+    seenEvents: P.seenEvents || "",    // última actividad vista
+    sync: null,
     shown: 20,
     scan: null,
     map: null,
   };
-  const persist = () => store.save({ saved: S.saved, dropped: S.dropped, sort: S.sort, token: S.token, zones: S.zones });
+  const persist = () => store.save({ saved: S.saved, dropped: S.dropped, sort: S.sort, token: S.token, zones: S.zones,
+    removed: S.removed, seenEvents: S.seenEvents });
 
   function initialView() {
     const q = new URLSearchParams(location.search).get("tab") || location.hash.replace("#", "");
@@ -44,6 +48,9 @@
     const h = Math.round(m / 60); if (h < 24) return `hace ${h} h`;
     return `hace ${Math.round(h / 24)} d`;
   };
+  const monthsTxt = (d) => (d >= 60 ? `${Math.round(d / 30)} meses` : `${d} días`);
+  const ENERGY_COLORS = { A: "#1a9850", B: "#4caf50", C: "#a6d96a", D: "#e6d000", E: "#fdae61", F: "#f46d43", G: "#d73027", H: "#b2182b", I: "#8b0000" };
+  const energyChip = (c, big) => c ? `<span class="energy ${big ? "big" : ""}" style="background:${ENERGY_COLORS[c] || "#999"}">${c}</span>` : "";
   const floorTxt = (n) => (n === 0 ? "bajo" : n >= 90 ? "último piso" : `${n}.ª planta`);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : null);
@@ -60,6 +67,7 @@
     out: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>',
     pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
     photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8"/></svg>',
+    bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
     sort: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>',
   };
 
@@ -150,6 +158,8 @@
     if (l.badges.includes("bajada")) t.push('<span class="tag drop">↓ Bajada</span>');
     if (l.badges.includes("exclusivo")) t.push(`<span class="tag excl">Solo en ${esc(l.only_on || "agencia")}</span>`);
     if (l.badges.includes("reanunciado")) t.push('<span class="tag relist">Reanunciado</span>');
+    if (l.badges.includes("compromiso")) t.push('<span class="tag gone">Compromiso</span>');
+    if (l.badges.includes("negociable")) t.push(`<span class="tag relist" title="${l.days_on_market} días a la venta">${monthsTxt(l.days_on_market)} a la venta</span>`);
     if (l.badges.includes("obra nueva")) t.push('<span class="tag">Obra nueva</span>');
     return t.join("");
   }
@@ -176,6 +186,8 @@
     if (l.rooms != null) f.push(`<span><b>${l.rooms}</b> dorm.</span>`);
     if (l.baths) f.push(`<span><b>${l.baths}</b> baño${l.baths > 1 ? "s" : ""}</span>`);
     if (l.floor != null) f.push(`<span>${floorTxt(l.floor)}</span>`);
+    const d = l.details || {};
+    if (d.energy_class) f.push(`<span class="ec">${energyChip(d.energy_class)} energía</span>`);
     l.features.slice(0, 3).forEach((x) => f.push(`<span>${esc(x)}</span>`));
     return `<div class="facts">${f.join("")}</div>`;
   }
@@ -230,7 +242,10 @@
     const m2 = act.map((l) => l.eur_m2).sort((a, b) => a - b);
     const sub = `${esc(zoneLabel())} · actualizado ${ago(d.generated_at)}`;
     const srcOk = (d.sources || []).filter((x) => !x.error).length;
-    return `${largeTitle("Pisos", sub)}
+    const ev = (d.events || []);
+    const unseen = ev.filter((e) => e.at > S.seenEvents).length;
+    const bell = `<button class="circle-btn glass" id="bell" aria-label="Actividad${unseen ? `, ${unseen} sin ver` : ""}">${I.bell}${unseen ? `<span class="dot-n">${unseen > 9 ? "9+" : unseen}</span>` : ""}</button>`;
+    return `${largeTitle("Pisos", sub, bell)}
       <div class="statline">
         <div class="stat glass"><b>${act.length}</b><span>activos</span></div>
         <div class="stat glass"><b>${counts.nuevos}</b><span>nuevos</span></div>
@@ -323,7 +338,23 @@
     el.querySelector("#z-apply").addEventListener("click", close);
   }
 
+  const EV = { chollo: ["🔥", "Chollo"], nuevo: ["✦", "Nuevo"], bajada: ["↓", "Bajada"], retirado: ["✕", "Retirado"], compromiso: ["✎", "Compromiso"] };
+  function openActivity() {
+    const ev = [...(S.data.events || [])].reverse();
+    const prev = S.seenEvents;
+    S.seenEvents = ev.length ? ev[0].at : S.seenEvents; persist();
+    const n = S.data.notify || {};
+    const rows = ev.map((e) => `<button class="cell ev-row ${e.at > prev ? "unseen" : ""}" data-ev="${esc(e.id)}">
+        <span class="ev-ico ev-${e.type}">${EV[e.type] ? EV[e.type][0] : "•"}</span>
+        <span class="ev-txt"><b>${esc(e.title)}</b><small>${esc(e.body)}</small></span><span class="v">${ago(e.at)}</span></button>`).join("");
+    const { el, close } = sheet(`<div class="sheet-head"><h2>Actividad</h2></div>
+      ${ev.length ? `<div class="group">${rows}</div>` : `<div class="empty glass"><h3>Sin avisos todavía</h3><p>Aquí aparecerán chollos, pisos nuevos, bajadas y cambios en tus guardados.</p></div>`}
+      <p class="note">Te avisamos de: chollos (${Math.round((n.deal_discount || 0.15) * 100)} % bajo la mediana o ${n.deal_score || 85}+ puntos) y pisos nuevos o rebajados en ${esc((n.zones || []).join(", ") || "toda la ciudad")}; y de bajadas, retiradas y compromisos de tus guardados, estén donde estén. Se revisa cada 2 horas de día.</p>`, () => render());
+    el.querySelectorAll("[data-ev]").forEach((b) => b.addEventListener("click", () => { close(); openDetail(b.dataset.ev); }));
+  }
+
   function bind() {
+    document.getElementById("bell")?.addEventListener("click", openActivity);
     document.getElementById("zone-btn")?.addEventListener("click", openZones);
     document.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { S.filter = b.dataset.filter; S.shown = 20; render(); }));
     const sel = document.getElementById("sort");
@@ -357,10 +388,13 @@
   /* ───────────── acciones ───────────── */
   function act(id, what) {
     if (what === "save") {
-      if (S.saved[id]) { delete S.saved[id]; } else { S.saved[id] = Date.now(); toast("Guardado"); }
+      if (S.saved[id]) { delete S.saved[id]; S.removed[id] = Date.now(); }
+      else { S.saved[id] = Date.now(); delete S.removed[id]; toast("Guardado · te avisaremos si baja o se retira"); }
+      queueSync();
     }
     if (what === "drop") {
-      S.dropped[id] = Date.now(); delete S.saved[id];
+      S.dropped[id] = Date.now();
+      if (S.saved[id]) { delete S.saved[id]; S.removed[id] = Date.now(); queueSync(); }
       toast("Descartado", () => { delete S.dropped[id]; persist(); render(); });
     }
     persist(); const y = scrollY; render(); scrollTo(0, y);
@@ -415,6 +449,28 @@
     return { el: sh, close };
   }
 
+  function fichaGroup(l) {
+    const d = l.details;
+    if (!d) return `<p class="note" style="margin:14px 6px 0">La ficha completa (clase energética, gastos, año…) se descarga para tus barrios de aviso, tus guardados y los mejor puntuados.</p>`;
+    const rows = [];
+    const row = (k, v) => v != null && v !== "" && rows.push(`<div class="cell"><span class="k">${k}</span><span class="v">${v}</span></div>`);
+    row("Clase energética", d.energy_class ? `${energyChip(d.energy_class, true)}${d.insulation_class ? ` <small style="color:var(--label-2)">aislamiento</small> ${energyChip(d.insulation_class, true)}` : ""}` : null);
+    row("Construcción", d.construction_year ? `${d.construction_year}${d.renovation_year ? ` · reformado ${d.renovation_year}` : ""}` : null);
+    row("Gastos de comunidad", d.charges_month ? `${eur(d.charges_month)}/mes` : null);
+    row("Calefacción", d.heating && d.heating.length ? esc(d.heating.join(", ")) : null);
+    const out = [d.terrace_m2 && `terraza${d.terrace_m2 > 1 ? ` ${nf1.format(d.terrace_m2)} m²` : ""}`,
+      d.balcony_m2 && `balcón${d.balcony_m2 > 1 ? ` ${nf1.format(d.balcony_m2)} m²` : ""}`,
+      d.garden_m2 && `jardín${d.garden_m2 > 1 ? ` ${nf1.format(d.garden_m2)} m²` : ""}`].filter(Boolean);
+    row("Exterior", out.length ? out.join(" · ") : null);
+    row("Ascensor", d.lift ? "Sí" : null);
+    row("Parking", d.parking ? `${d.parking} plaza${d.parking > 1 ? "s" : ""}` : null);
+    row("Trastero / cave", d.cellar ? "Sí" : null);
+    row("Mandato", d.exclusive_mandate ? "Exclusivo de la agencia" : null);
+    row("Estado", d.under_offer ? '<span style="color:var(--red);font-weight:600">Con compromiso de venta</span>' : null);
+    if (safeUrl(d.virtual_visit)) rows.push(`<div class="cell"><span class="k">Visita virtual</span><a class="v" href="${esc(d.virtual_visit)}" target="_blank" rel="noopener">Abrir ↗</a></div>`);
+    return rows.length ? `<p class="group-label">Ficha</p><div class="group">${rows.join("")}</div>` : "";
+  }
+
   function openDetail(id) {
     const l = byId(id); if (!l) return;
     const p = l.score_parts, w = S.data.weights, ws = Object.values(w).reduce((a, b) => a + b, 0) || 1;
@@ -442,9 +498,11 @@
       <p class="group-label">Por qué ${l.score}</p>
       <div class="group"><div class="cell stack"><div class="parts">${parts.map(([k, label, det]) => `
         <div class="part"><span>${label} <small style="display:inline;color:var(--label-3)">${Math.round(100 * w[k] / ws)} %</small></span><span class="bar"><i style="width:${p[k]}%"></i></span><b>${p[k]}</b><small>${esc(det)}</small></div>`).join("")}</div></div></div>
+      ${fichaGroup(l)}
       <p class="group-label">Historial</p>
       <div class="group">
-        <div class="cell"><span class="k">Visto por primera vez</span><span class="v">${day(l.first_seen)} · ${l.days_listed} d</span></div>
+        ${l.details && l.details.listed_since ? `<div class="cell"><span class="k">Publicado desde</span><span class="v">${day(l.details.listed_since)} · ${monthsTxt(l.days_on_market)}</span></div>` : ""}
+        <div class="cell"><span class="k">Visto por la app</span><span class="v">${day(l.first_seen)} · ${l.days_listed} d</span></div>
         ${l.price_history.length > 1 ? l.price_history.map((h) => `<div class="cell"><span class="k">${day(h.date)}</span><span class="v">${eur(h.price)}</span></div>`).join("") : ""}
         ${maps ? `<div class="cell"><span class="k">Ubicación ${l.geo_precision === "exacta" ? "" : "aproximada"}</span><a class="v" href="${maps}" target="_blank" rel="noopener">Abrir en Mapas ↗</a></div>` : ""}
       </div>
@@ -552,6 +610,48 @@
     await load(true);
   }
 
+  const b64enc = (str) => btoa(unescape(encodeURIComponent(str)));
+  const b64dec = (str) => decodeURIComponent(escape(atob(str.replace(/\s/g, ""))));
+  let syncTimer = null;
+  function queueSync() { clearTimeout(syncTimer); syncTimer = setTimeout(syncWatch, 1500); }
+
+  async function syncWatch() {
+    if (!S.token || !repo()) return;
+    const url = `${GH}/repos/${repo()}/contents/data/watch.json`;
+    try {
+      let sha = null, remote = { saved: {}, removed: {} };
+      const g = await fetch(`${url}?ref=main`, { headers: ghHeaders(), cache: "no-store" });
+      if (g.ok) { const j = await g.json(); sha = j.sha; remote = JSON.parse(b64dec(j.content)); }
+      else if (g.status !== 404) throw new Error(`GET ${g.status}`);
+      // fusiona: gana la acción más reciente de cada piso (guardar o quitar)
+      const ids = new Set([...Object.keys(S.saved), ...Object.keys(S.removed), ...Object.keys(remote.saved || {}), ...Object.keys(remote.removed || {})]);
+      const saved = {}, removed = {};
+      ids.forEach((id) => {
+        const s = Math.max(S.saved[id] || 0, (remote.saved || {})[id] || 0);
+        const r = Math.max(S.removed[id] || 0, (remote.removed || {})[id] || 0);
+        if (s > r) saved[id] = s; else if (r) removed[id] = r;
+      });
+      const changedLocal = JSON.stringify(saved) !== JSON.stringify(S.saved);
+      S.saved = saved; S.removed = removed; persist();
+      const body = JSON.stringify({ saved, removed }, null, 1);
+      if (body !== JSON.stringify({ saved: remote.saved || {}, removed: remote.removed || {} }, null, 1)) {
+        const p = await fetch(url, { method: "PUT", headers: { ...ghHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "Guardados: sincronización desde la app", content: b64enc(body), branch: "main", ...(sha ? { sha } : {}) }) });
+        if (p.status === 403 || p.status === 404) throw new Error("perm");
+        if (p.status === 409) { setTimeout(syncWatch, 3000); return; }
+        if (!p.ok) throw new Error(`PUT ${p.status}`);
+      }
+      S.sync = { ok: true, at: Date.now() };
+      if (changedLocal) { const y = scrollY; render(); scrollTo(0, y); }
+    } catch (e) {
+      S.sync = { ok: false, msg: e.message === "perm" ? "La clave necesita Contents: Read and write para sincronizar guardados." : "No se pudieron sincronizar los guardados." };
+    }
+    const c = document.getElementById("sync-status");
+    if (c) c.outerHTML = syncStatus();
+  }
+  const syncStatus = () => `<p class="note" id="sync-status" style="margin:0;color:${S.sync && !S.sync.ok ? "var(--red)" : "var(--label-2)"}">${
+    !S.sync ? "" : S.sync.ok ? `Guardados sincronizados ${ago(new Date(S.sync.at).toISOString())}: el servidor vigila sus bajadas y retiradas.` : esc(S.sync.msg)}</p>`;
+
   function renderToken() {
     const c = document.getElementById("token-cell"); if (!c) return;
     const r = repo();
@@ -559,8 +659,8 @@
       ? `<span class="status ok">Clave guardada en este dispositivo</span>
          <p class="note" style="margin:0">Repositorio: ${esc(r || "?")}. Pulsa el botón ↻ de abajo para escanear.</p>
          <div class="actions"><button class="pill-btn" id="tok-test">Comprobar</button><button class="pill-btn" id="tok-del">Borrar clave</button></div>
-         <p class="note" id="tok-msg" style="margin:0"></p>`
-      : `<p class="note" style="margin:0;color:var(--label)">Crea una clave «fine-grained» en GitHub (Settings → Developer settings → Personal access tokens) con acceso solo a <b>${esc(r || "tu repositorio")}</b> y estos permisos: <b>Actions: Read and write</b> y <b>Contents: Read-only</b>. Pégala aquí:</p>
+         <p class="note" id="tok-msg" style="margin:0"></p>${syncStatus()}`
+      : `<p class="note" style="margin:0;color:var(--label)">Crea una clave «fine-grained» en GitHub (Settings → Developer settings → Personal access tokens) con acceso solo a <b>${esc(r || "tu repositorio")}</b> y estos permisos: <b>Actions: Read and write</b> y <b>Contents: Read and write</b> (para sincronizar tus guardados). Pégala aquí:</p>
          <input class="input" id="tok-in" type="password" autocomplete="off" placeholder="github_pat_…" aria-label="Clave de GitHub">
          <div class="actions"><button class="pill-btn primary" id="tok-save" style="margin-left:0">Guardar</button></div>
          <p class="note" id="tok-msg" style="margin:0"></p>`;
@@ -574,7 +674,7 @@
     };
     document.getElementById("tok-save")?.addEventListener("click", async () => {
       const v = document.getElementById("tok-in").value.trim(); if (!v) return;
-      S.token = v; persist(); renderToken(); await test();
+      S.token = v; persist(); renderToken(); if (await test()) syncWatch();
     });
     document.getElementById("tok-test")?.addEventListener("click", test);
     document.getElementById("tok-del")?.addEventListener("click", () => { S.token = ""; persist(); renderToken(); });
@@ -660,6 +760,13 @@
     } catch { if (!S.data) S.data = null; }
     S.loading = false;
     if (!silent) render();
+    if (!silent && !load.routed && S.data) {
+      load.routed = true;
+      const q = new URLSearchParams(location.search);
+      if (q.get("id")) openDetail(q.get("id"));
+      else if (q.get("tab") === "actividad") openActivity();
+      if (S.token) syncWatch();
+    }
   }
 
   frame(); render(); load();

@@ -14,6 +14,8 @@ sys.path.insert(0, str(ROOT))
 from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
 
 from backend import push  # noqa: E402
+from backend.alerts import compose, compute_events  # noqa: E402
+from backend.enrich import parse_athome_detail, parse_generic_detail  # noqa: E402
 from backend.geo import Geocoder  # noqa: E402
 from backend.pipeline import ingest, is_active, mark_gone, score_all  # noqa: E402
 from backend.sources import athome, immotop_email, trovit, wortimmo  # noqa: E402
@@ -131,6 +133,37 @@ def test_webpush_roundtrip():
     priv, pub = push.generate_vapid_keys()
     hdr = push.vapid_header("https://web.push.apple.com/abc", push.load_vapid_private(priv), "mailto:a@b.c")
     assert hdr.startswith("vapid t=") and hdr.endswith(pub)
+
+
+def test_athome_detail():
+    app = {"preloadedState": {"listing": {"listing": {
+        "address": {"street": "Rue Jean L'aveugle", "floor": 2}, "charges": 1200, "chargesPaymentFrequency": "yearly",
+        "characteristic": {"constructionYear": 1972, "hasLift": True, "balconySurface": 4, "hasCellar": True, "garages": 1},
+        "energy": {"energyEfficiency": {"energyClass": "F"}, "thermalInsulation": {"insulationClass": "G"}, "hasGasHeating": True},
+        "createdAt": "20251024T135411Z", "status": "active", "media": {"photos": ["/cd/7c/x.jpg"], "virtualVisit": "https://tour"}},
+        "listingOld": {"underSalesAgreement": False}}}}
+    d = parse_athome_detail(f"<script>window.AT_HOME_APP = {json.dumps(app)};</script>")
+    assert (d["energy_class"], d["insulation_class"], d["construction_year"], d["charges_month"]) == ("F", "G", 1972, 100)
+    assert d["lift"] and d["balcony_m2"] == 4 and d["parking"] == 1 and d["cellar"] and d["heating"] == ["gas"]
+    assert d["listed_since"] == "2025-10-24" and not d["under_offer"] and d["photos"][0].endswith("image_//cd/7c/x.jpg")
+    g = parse_generic_detail("<p>Classe énergétique : C</p><p>Année de construction : 2019</p><p>Ascenseur</p><p>Terrasse 12 m²</p>")
+    assert g["energy_class"] == "C" and g["construction_year"] == 2019 and g["lift"] and g["terrace_m2"] == 12
+
+
+def test_alerts():
+    cfg = {"notify": {"zones": ["Merl"], "deal_discount": 0.15, "deal_score": 99, "min_score": 0}}
+    mk = lambda i, zone, disc, active=True, badges=(): {"id": i, "zone": zone, "price": 800000, "surface": 90, "rooms": 2,
+                                                     "score": 60, "discount": disc, "active": active, "badges": list(badges)}
+    h = {"listings": {"a": {"price_history": [{"date": "2026-10-14", "price": 800000}]},
+                      "b": {"price_history": [{"date": "2026-10-01", "price": 850000}, {"date": "2026-10-14", "price": 800000}]},
+                      "c": {}, "d": {}, "e": {}}}
+    ranked = [mk("a", "Merl", 0.2), mk("b", "Merl", 0.0), mk("c", "Gare", 0.3), mk("d", "Gare", 0, active=False),
+              mk("e", "Gare", 0, badges=["compromiso"])]
+    ev = compute_events(h, ranked, {"a", "c"}, cfg, {"d", "e"}, NOW, backfill=False)
+    assert sorted(e["type"] for e in ev) == ["bajada", "chollo", "compromiso", "retirado"]  # c: fuera de zona
+    assert compute_events(h, ranked, {"a", "c"}, cfg, {"d", "e"}, NOW, backfill=False) == []  # no repite
+    p = compose(ev)
+    assert p["title"].startswith("Chollo en Merl") and "1 bajada" in p["body"]
 
 
 if __name__ == "__main__":
