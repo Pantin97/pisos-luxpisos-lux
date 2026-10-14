@@ -18,13 +18,66 @@ from .sources.base import Fetcher, clean, fold, parse_int
 ENERGY_ORDER = "ABCDEFGHI"
 
 
+JS_TOKENS = re.compile(r"([:\[,]\s*)(undefined|NaN|-?Infinity)(?=\s*[,}\]])")
+
+
 def _json_after(html: str, marker: str) -> dict:
     i = html.find(marker)
     if i < 0:
         raise ValueError(f"no {marker}")
     start = html.index("{", i)
-    obj, _ = json.JSONDecoder().raw_decode(html[start:])
+    end = html.find("</script>", start)
+    text = html[start:end if end > 0 else None]
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(text)
+    except json.JSONDecodeError:
+        obj, _ = json.JSONDecoder().raw_decode(JS_TOKENS.sub(r"\1null", text))
     return obj
+
+
+def _rx_detail(html: str) -> dict:
+    """Plan B: los campos de la ficha leídos con expresiones regulares en el bloque del piso."""
+    m = re.search(r'"listing":\s*\{\s*"listing":\s*\{', html)
+    if not m:
+        raise ValueError("ficha sin bloque listing")
+    i = m.start()
+    j = html.find('"similarListings"', i)
+    blk = html[i:j if j > 0 else i + 60000]
+
+    def g(key, typ=str):
+        m = re.search(rf'"{key}":\s*("([^"]*)"|-?\d+(?:\.\d+)?|true|false|null)', blk)
+        if not m:
+            return None
+        raw = m.group(2) if m.group(2) is not None else m.group(1)
+        if raw in ("null", ""):
+            return None
+        if typ is bool:
+            return raw == "true"
+        if typ in (int, float):
+            try:
+                return typ(float(raw))
+            except ValueError:
+                return None
+        return raw
+
+    created = g("createdAt") or ""
+    charges, freq = g("charges", float) or 0, g("chargesPaymentFrequency") or "monthly"
+    parking = sum(g(k, int) or 0 for k in ("garages", "indoorParking", "outdoorParking"))
+    return {
+        "energy_class": _cls(g("energyClass")), "insulation_class": _cls(g("insulationClass")),
+        "construction_year": g("constructionYear", int), "renovation_year": g("renovationYear", int),
+        "charges_month": round(charges / 12) if freq == "yearly" and charges else (round(charges) or None),
+        "heating": [lbl for key, lbl in (("hasGasHeating", "gas"), ("hasPumpHeating", "bomba de calor"),
+                                         ("hasOilHeating", "gasóleo"), ("hasElectricHeating", "eléctrica"))
+                    if g(key, bool)],
+        "lift": bool(g("hasLift", bool)), "balcony_m2": g("balconySurface", float) or (1 if g("hasBalcony", bool) else None),
+        "terrace_m2": g("terraceSurface", float) or (1 if g("hasTerrace", bool) else None),
+        "garden_m2": g("gardenSurface", float) or (1 if g("hasGarden", bool) else None),
+        "parking": parking or None, "cellar": bool(g("hasCellar", bool)),
+        "listed_since": f"{created[:4]}-{created[4:6]}-{created[6:8]}" if re.match(r"\d{8}", created) else None,
+        "under_offer": bool(g("underSalesAgreement", bool)), "exclusive_mandate": bool(g("hasExclusiveMandate", bool)),
+        "virtual_visit": g("virtualVisit"), "photos": [], "description": None,
+    }
 
 
 def _cls(v) -> str | None:
@@ -33,7 +86,10 @@ def _cls(v) -> str | None:
 
 
 def parse_athome_detail(html: str) -> dict:
-    app = _json_after(html, "window.AT_HOME_APP")
+    try:
+        app = _json_after(html, "window.AT_HOME_APP")
+    except (ValueError, json.JSONDecodeError):
+        return {k: v for k, v in _rx_detail(html).items() if v not in (None, [], "")}
     lst = app["preloadedState"]["listing"]
     x, old = lst["listing"], lst.get("listingOld") or {}
     ch = x.get("characteristic") or {}

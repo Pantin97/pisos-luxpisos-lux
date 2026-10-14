@@ -146,6 +146,11 @@ def test_athome_detail():
     assert (d["energy_class"], d["insulation_class"], d["construction_year"], d["charges_month"]) == ("F", "G", 1972, 100)
     assert d["lift"] and d["balcony_m2"] == 4 and d["parking"] == 1 and d["cellar"] and d["heating"] == ["gas"]
     assert d["listed_since"] == "2025-10-24" and not d["under_offer"] and d["photos"][0].endswith("image_//cd/7c/x.jpg")
+    raw = f"<script>window.AT_HOME_APP = {json.dumps(app)};</script>".replace('"status": "active"', '"status": "active", "x": undefined')
+    assert parse_athome_detail(raw)["energy_class"] == "F"  # valores JS no-JSON
+    broken = raw.replace('"status"', 'status')  # JSON roto: plan B por regex
+    rx = parse_athome_detail(broken)
+    assert (rx["energy_class"], rx["construction_year"], rx["charges_month"], rx["listed_since"]) == ("F", 1972, 100, "2025-10-24")
     g = parse_generic_detail("<p>Classe énergétique : C</p><p>Année de construction : 2019</p><p>Ascenseur</p><p>Terrasse 12 m²</p>")
     assert g["energy_class"] == "C" and g["construction_year"] == 2019 and g["lift"] and g["terrace_m2"] == 12
 
