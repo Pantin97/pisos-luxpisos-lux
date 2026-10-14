@@ -17,7 +17,7 @@ from .geo import Geocoder, haversine_km
 from .sources.base import Listing, fold
 
 MAJOR = {"athome", "immotop"}
-SOURCE_LABEL = {"athome": "athome", "wortimmo": "wortimmo", "trovit": "Trovit", "immotop": "Immotop"}
+SOURCE_LABEL = {"athome": "athome", "wortimmo": "Wortimmo", "trovit": "Trovit", "immotop": "Immotop"}
 
 
 def _today(dt: datetime) -> str:
