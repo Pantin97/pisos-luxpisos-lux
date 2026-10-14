@@ -179,9 +179,12 @@ def candidates(history: dict, cfg: dict, watched: set[str], ranked: list[dict]) 
     return list(picked.values())
 
 
+DETAIL_VERSION = 2  # súbelo al cambiar cómo se lee la ficha: fuerza a descargarlas de nuevo
+
+
 def needs_refresh(rec: dict, today: date, max_age_days: int) -> bool:
     d = rec.get("details") or {}
-    if not d.get("fetched"):
+    if not d.get("fetched") or d.get("v") != DETAIL_VERSION:
         return True
     if d.get("price") != rec.get("price"):
         return True
@@ -212,6 +215,7 @@ def enrich(history: dict, cfg: dict, watched: set[str], ranked: list[dict], fetc
             continue
         stats["pages"] += 1
         d["fetched"] = today.isoformat()
+        d["v"] = DETAIL_VERSION
         d["price"] = rec.get("price")
         rec["details"] = d
         # la ficha manda sobre la lista en los datos que comparten
