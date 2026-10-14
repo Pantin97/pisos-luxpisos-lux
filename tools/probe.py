@@ -14,6 +14,7 @@ URLS = {
  "glesener": "https://www.glesener.lu",
 }
 out = pathlib.Path("probe"); out.mkdir(exist_ok=True)
+sys.stdout.reconfigure(line_buffering=True)
 s = requests.Session(); s.headers.update(UA)
 for name, url in URLS.items():
     try:
